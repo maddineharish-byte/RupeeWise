@@ -338,6 +338,7 @@ Ask me anything about your current budget or try one of the starter questions be
             <input
               type="text"
               placeholder="Ask RupeeWise about budgeting, purchases, or savings..."
+              aria-label="Ask RupeeWise financial advisor"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={isLoading}

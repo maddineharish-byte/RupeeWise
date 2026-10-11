@@ -51,7 +51,35 @@ export function ProjectionTimelineChart({
   };
 
   return (
-    <div className="w-full h-72">
+    <div
+      role="region"
+      aria-label={`Projection timeline chart comparing baseline against ${scenarioName || 'simulated scenario'}`}
+      className="w-full h-72"
+    >
+      {/* Screen reader accessible data summary table */}
+      <div className="sr-only">
+        <h4>Daily cash balance trajectory table:</h4>
+        <table>
+          <caption>Comparison between baseline and {scenarioName} across the 30-day cycle</caption>
+          <thead>
+            <tr>
+              <th scope="col">Day</th>
+              <th scope="col">Baseline Balance (₹)</th>
+              <th scope="col">Simulated Balance (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((d) => (
+              <tr key={d.day}>
+                <td>Day {d.day}</td>
+                <td>₹{(d.baselinePaise / 100).toLocaleString('en-IN')}</td>
+                <td>₹{(d.scenarioPaise / 100).toLocaleString('en-IN')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={chartData}

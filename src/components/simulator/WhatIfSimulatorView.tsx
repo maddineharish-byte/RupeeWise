@@ -277,10 +277,11 @@ export function WhatIfSimulatorView() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label htmlFor="scenario-name" className="block text-xs font-medium text-slate-700 mb-1">
               Scenario Name
             </label>
             <input
+              id="scenario-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -291,12 +292,13 @@ export function WhatIfSimulatorView() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label htmlFor="scenario-onetime" className="block text-xs font-medium text-slate-700 mb-1">
                 One-Time Expense (₹)
               </label>
               <div className="relative">
                 <span className="absolute left-2.5 top-1.5 text-slate-400 text-xs font-mono">₹</span>
                 <input
+                  id="scenario-onetime"
                   type="number"
                   min="0"
                   step="any"
@@ -308,10 +310,11 @@ export function WhatIfSimulatorView() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label htmlFor="scenario-effective-day" className="block text-xs font-medium text-slate-700 mb-1">
                 Effective Day (Day 10–30)
               </label>
               <input
+                id="scenario-effective-day"
                 type="number"
                 min={state.period.currentDay}
                 max={state.period.totalDays}
@@ -324,12 +327,13 @@ export function WhatIfSimulatorView() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label htmlFor="scenario-daily-delta" className="block text-xs font-medium text-slate-700 mb-1">
                 Daily Spend Delta (₹/day)
               </label>
               <div className="relative">
                 <span className="absolute left-2.5 top-1.5 text-slate-400 text-xs font-mono">₹</span>
                 <input
+                  id="scenario-daily-delta"
                   type="number"
                   step="any"
                   placeholder="+/- per day"
@@ -342,12 +346,13 @@ export function WhatIfSimulatorView() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label htmlFor="scenario-income" className="block text-xs font-medium text-slate-700 mb-1">
                 Additional Income (₹)
               </label>
               <div className="relative">
                 <span className="absolute left-2.5 top-1.5 text-slate-400 text-xs font-mono">₹</span>
                 <input
+                  id="scenario-income"
                   type="number"
                   min="0"
                   step="any"
@@ -362,12 +367,13 @@ export function WhatIfSimulatorView() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label htmlFor="scenario-recurring" className="block text-xs font-medium text-slate-700 mb-1">
                 Recurring Commitment (₹)
               </label>
               <div className="relative">
                 <span className="absolute left-2.5 top-1.5 text-slate-400 text-xs font-mono">₹</span>
                 <input
+                  id="scenario-recurring"
                   type="number"
                   min="0"
                   step="any"
@@ -379,12 +385,13 @@ export function WhatIfSimulatorView() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
+              <label htmlFor="scenario-savings" className="block text-xs font-medium text-slate-700 mb-1">
                 Savings Contribution (₹)
               </label>
               <div className="relative">
                 <span className="absolute left-2.5 top-1.5 text-slate-400 text-xs font-mono">₹</span>
                 <input
+                  id="scenario-savings"
                   type="number"
                   min="0"
                   step="any"

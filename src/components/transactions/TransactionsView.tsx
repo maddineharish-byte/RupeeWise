@@ -190,6 +190,7 @@ export function TransactionsView() {
             <input
               type="text"
               placeholder="Search description or category..."
+              aria-label="Search transactions by description or category"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-slate-400 focus:outline-none"
@@ -199,6 +200,7 @@ export function TransactionsView() {
           {/* Category Dropdown */}
           <div className="w-full md:w-48">
             <select
+              aria-label="Filter transactions by category"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:bg-white focus:outline-none"
@@ -397,6 +399,7 @@ export function TransactionsView() {
                               setEditingTx(tx);
                               setIsModalOpen(true);
                             }}
+                            aria-label={`Edit transaction: ${tx.description}`}
                             title="Edit transaction"
                             className="p-1.5 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 transition-colors"
                           >
@@ -404,6 +407,7 @@ export function TransactionsView() {
                           </button>
                           <button
                             onClick={() => setDeleteTargetId(tx.id)}
+                            aria-label={`Delete transaction: ${tx.description}`}
                             title="Delete transaction"
                             className="p-1.5 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition-colors"
                           >

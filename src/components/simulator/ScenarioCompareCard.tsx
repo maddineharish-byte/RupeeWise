@@ -121,12 +121,31 @@ export function ScenarioCompareCard({
           ))}
         </div>
 
-        {/* Dynamic Insight Banner */}
-        <div className="mt-4 p-4 rounded-lg bg-indigo-50/60 border border-indigo-100 text-xs text-indigo-950 leading-relaxed">
-          <strong className="font-semibold text-indigo-900 block mb-1">
-            Financial Impact Insight:
-          </strong>
-          {projection.insightSummary}
+        {/* Dynamic Insight Banner & Calculated Runway Analysis */}
+        <div className="mt-4 p-4 rounded-lg bg-indigo-50/60 border border-indigo-100 text-xs text-indigo-950 leading-relaxed space-y-2">
+          <div>
+            <strong className="font-semibold text-indigo-900 block mb-0.5">
+              Financial Impact Insight:
+            </strong>
+            <p>{projection.insightSummary}</p>
+          </div>
+          <div className="pt-2 border-t border-indigo-100/80 flex flex-wrap items-center justify-between gap-2 text-[11px] text-indigo-900 font-mono">
+            <span>
+              Simulated Runway:{' '}
+              <strong className="font-bold">
+                {projection.isDeficit
+                  ? '0 Days (Deficit Risk)'
+                  : `${Math.max(1, Math.round(projection.scenarioAvailablePaise / Math.max(1, projection.scenarioDailyAllowancePaise)))} Days Safe`}
+              </strong>
+            </span>
+            <span>
+              Health Impact:{' '}
+              <strong className="font-bold">
+                {projection.healthScoreDelta >= 0 ? `+${projection.healthScoreDelta}` : projection.healthScoreDelta} pts
+              </strong>{' '}
+              ({projection.scenarioRiskLevel} Risk)
+            </span>
+          </div>
         </div>
       </div>
     </div>

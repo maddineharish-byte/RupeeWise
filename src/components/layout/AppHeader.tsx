@@ -99,6 +99,7 @@ export function AppHeader({
           {/* Live Voice Button */}
           <button
             onClick={onOpenVoiceModal}
+            aria-label="Real-time Voice Mode with Gemini 3.8 Live"
             title="Real-time Voice Conversation with Gemini 3.8 Live"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors whitespace-nowrap"
           >
@@ -108,6 +109,7 @@ export function AppHeader({
 
           <button
             onClick={onOpenResetConfirm}
+            aria-label="Reset demo dataset to hackathon baseline"
             title="Reset to canonical hackathon seed dataset"
             className="hidden lg:inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap"
           >
@@ -117,6 +119,7 @@ export function AppHeader({
 
           <button
             onClick={onOpenAddTransaction}
+            aria-label="Log new transaction"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors shadow-xs whitespace-nowrap"
           >
             <PlusCircle className="w-4 h-4 text-emerald-400" />

@@ -71,7 +71,35 @@ export function SpendingBudgetChart({
   };
 
   return (
-    <div className="w-full h-64">
+    <div
+      role="region"
+      aria-label="30-day budget allocation and spending breakdown bar chart"
+      className="w-full h-64"
+    >
+      {/* Screen reader accessible data table */}
+      <div className="sr-only">
+        <h4>Budget Allocation Summary Table:</h4>
+        <table>
+          <caption>Comparison of budget allocations and actual cash status</caption>
+          <thead>
+            <tr>
+              <th scope="col">Category</th>
+              <th scope="col">Amount (₹)</th>
+              <th scope="col">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((d) => (
+              <tr key={d.name}>
+                <td>{d.name}</td>
+                <td>₹{d.amount.toLocaleString('en-IN')}</td>
+                <td>{d.label}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />

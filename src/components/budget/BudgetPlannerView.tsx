@@ -248,6 +248,7 @@ export function BudgetPlannerView() {
               <input
                 type="text"
                 placeholder="Bill description (e.g. Electricity)"
+                aria-label="Bill description"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 className="sm:col-span-2 px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none"
@@ -256,12 +257,14 @@ export function BudgetPlannerView() {
               <input
                 type="number"
                 placeholder="Amount (₹)"
+                aria-label="Bill amount in Rupees"
                 value={newAmountStr}
                 onChange={(e) => setNewAmountStr(e.target.value)}
                 className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg font-mono focus:outline-none"
                 required
               />
               <select
+                aria-label="Bill category"
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value as ExpenseCategory)}
                 className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none"
@@ -301,6 +304,7 @@ export function BudgetPlannerView() {
               <div className="flex items-start gap-3">
                 <button
                   onClick={() => handleTogglePaid(comm.id)}
+                  aria-label={comm.isPaid ? `Mark commitment ${comm.title} as unpaid` : `Mark commitment ${comm.title} as paid`}
                   title={comm.isPaid ? 'Mark as unpaid' : 'Mark as paid'}
                   className={`mt-0.5 p-1 rounded-md transition-colors ${
                     comm.isPaid
@@ -341,6 +345,7 @@ export function BudgetPlannerView() {
 
                 <button
                   onClick={() => setDeleteCommitmentId(comm.id)}
+                  aria-label={`Delete commitment: ${comm.title}`}
                   className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
                   title="Remove commitment"
                 >

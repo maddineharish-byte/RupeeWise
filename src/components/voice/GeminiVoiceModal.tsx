@@ -249,6 +249,7 @@ export function GeminiVoiceModal({ isOpen, onClose }: GeminiVoiceModalProps) {
         <div className="flex items-center gap-4">
           <button
             onClick={() => setIsMuted(!isMuted)}
+            aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
             className={`p-3.5 rounded-full border transition-all ${
               isMuted
                 ? 'bg-rose-500/20 border-rose-500 text-rose-400'

@@ -602,6 +602,7 @@ export function VoiceTransactionWidget({ onPopulateModal }: VoiceTransactionWidg
                   if (isListening) stopListening();
                   else startListening();
                 }}
+                aria-label={isListening ? 'Stop microphone listening' : 'Start microphone listening'}
                 className={`p-2.5 rounded-xl transition-all shadow-xs ${
                   isListening
                     ? 'bg-rose-500 text-white animate-pulse'
@@ -619,6 +620,7 @@ export function VoiceTransactionWidget({ onPopulateModal }: VoiceTransactionWidg
                     ? 'Listening... or type speech command here'
                     : 'Type e.g. "Bought books for 1200"'
                 }
+                aria-label="Transaction speech input or manual text command"
                 value={manualText || transcript || interimTranscript}
                 onChange={(e) => setManualText(e.target.value)}
                 onKeyDown={(e) => {
@@ -633,6 +635,7 @@ export function VoiceTransactionWidget({ onPopulateModal }: VoiceTransactionWidg
               <button
                 onClick={() => handleProcessTranscript(manualText)}
                 disabled={isProcessing || (!transcript && !interimTranscript && !manualText)}
+                aria-label="Process transaction text with Gemini"
                 className="p-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white rounded-xl shadow-xs transition-colors"
                 title="Process transcription with Gemini"
               >

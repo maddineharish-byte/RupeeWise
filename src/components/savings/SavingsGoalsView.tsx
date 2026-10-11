@@ -131,6 +131,7 @@ export function SavingsGoalsView() {
                         setEditingGoal(goal);
                         setIsGoalModalOpen(true);
                       }}
+                      aria-label={`Edit goal: ${goal.title}`}
                       className="p-1.5 text-slate-400 hover:text-slate-700 rounded transition-colors"
                       title="Edit goal"
                     >
@@ -138,6 +139,7 @@ export function SavingsGoalsView() {
                     </button>
                     <button
                       onClick={() => setDeleteGoalId(goal.id)}
+                      aria-label={`Delete goal: ${goal.title}`}
                       className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
                       title="Delete goal"
                     >

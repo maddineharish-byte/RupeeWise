@@ -1,54 +1,126 @@
-# Overview of RupeeWise
+# RupeeWise — Personal Finance Engine & Decision Simulator
 
-**RupeeWise** is an interactive, zero-drift personal finance engine and decision simulator built for the **"Broke But Functional — Survive the Month"** challenge. Designed specifically for students, young professionals, gig workers, and budget-conscious individuals living paycheck-to-paycheck, RupeeWise eliminates financial guesswork. It translates raw income and expense numbers into actionable, daily survival guidance—ensuring users never run out of money before month-end or default on non-negotiable commitments.
-
----
-
-## 1. The "Broke But Functional" Persona
-
-### The Challenge
-Living with a constrained monthly cash flow means every financial decision carries high stakes. For this persona:
-- **Zero Room for Error:** A surprise expense of ₹1,500 can trigger overdrafts, missed rent payments, or days without groceries.
-- **Mental Accounting Fatigue:** Trying to mentally calculate how much money is "actually free" versus what is already spoken for (bills, rent, EMI, wifi) creates continuous stress.
-- **The "False Balance" Illusion:** Bank apps display current cash balance (e.g., ₹8,500), but omit upcoming bills due next week (e.g., ₹6,000 rent), tricking the user into dangerous spending.
-
-### How RupeeWise Empowers the Persona
-RupeeWise provides ruthless clarity:
-- **Truth in Numbers:** Replaces misleading bank balances with **"Available to Spend Right Now"** and a dynamic **"Safe Daily Allowance"**.
-- **Pre-Commitment Protection:** Walls off upcoming fixed commitments (rent, utilities, loans) before discretionary spending begins.
-- **What If? Pre-Commitment Simulator:** Lets users simulate a purchase (e.g., "Can I buy a ₹1,200 jacket on day 15?") against their baseline month-end trajectory *before* spending a single real rupee.
-- **Survival-First Financial Health Score:** Evaluates runway, commitment buffer, and discretionary burn rate to give unambiguous survival diagnostics.
+> **"Broke But Functional — Survive the Month"**  
+> Zero-drift, integer-paise personal finance engine, commitment ring-fencer, and "What If?" predictive simulator designed to help cash-strapped students, young professionals, and gig workers survive the month without running out of money.
 
 ---
 
-## 2. Core Financial Mechanics & Paise-Based Accounting
+## 1. Product Overview & Target Hackathon Persona
 
-Unlike conventional personal finance apps that rely on floating-point arithmetic (`0.1 + 0.2 = 0.30000000000000004`), RupeeWise is architected with strict **integer paise accounting** (`1 INR = 100 paise`).
+### The "Broke But Functional" Challenge
+Living paycheck-to-paycheck or on a fixed monthly allowance creates continuous financial anxiety:
+- **Zero Room for Error:** An unexpected expense of ₹1,500 can trigger overdrafts, missed room rent, or days without groceries.
+- **Mental Accounting Fatigue:** Trying to mentally calculate how much money is "actually free" versus what is spoken for (rent, wifi, mess bills, EMI) leads to costly errors.
+- **The "False Balance" Illusion:** Banking apps display current bank balance (e.g. ₹8,500), but omit upcoming obligations due in 10 days (e.g. ₹6,000 rent), tricking users into reckless discretionary spending.
 
-### A. Zero-Drift Integer Paise Principle
-- All transactions, budgets, commitments, savings targets, and simulation inputs are stored, calculated, and projected as **64-bit integer paise**.
-- Formatting functions (`formatINR`, `paiseToRupees`, `rupeesToPaise`) strictly isolate presentation conversions to display boundaries, ensuring zero rounding anomalies or penny-drop inaccuracies.
-- Negative balances and cash flow deficits are **never artificially clamped to zero**. RupeeWise surfaces deficits transparently so users can respond before real-world default occurs.
+### How RupeeWise Solves This
+RupeeWise replaces financial guesswork with ruthless mathematical transparency:
+- **True Available-to-Spend:** Automatically ring-fences upcoming non-negotiable commitments before reporting spendable cash.
+- **Safe Daily Allowance:** Calculates exactly how much discretionary cash can be spent per day over the remaining days of the cycle.
+- **"What If?" Pre-Commitment Simulator:** Allows users to simulate purchases (e.g. "Can I buy a ₹12,000 smartphone on Day 12?") against their 30-day baseline runway *before* spending a single real rupee.
+- **Multi-Modal Logging:** Enables natural voice transaction capture via Gemini AI with automatic slot-filling and auditory confirmation chimes.
+
+---
+
+## 2. Architecture & Source Code Structure
+
+### System Architecture Diagram
+
+```
++-----------------------------------------------------------------------------+
+|                            BROWSER CLIENT (React 19 SPA)                    |
+|                                                                             |
+|  +--------------------+   +-----------------------+   +------------------+  |
+|  | Overview Dashboard |   | Budget & Commitments  |   | What If? Sandbox |  |
+|  +--------------------+   +-----------------------+   +------------------+  |
+|  +--------------------+   +-----------------------+   +------------------+  |
+|  | Transaction Ledger |   | Savings Goals Vault   |   | Health Scorecard |  |
+|  +--------------------+   +-----------------------+   +------------------+  |
+|                                                                             |
+|  +-----------------------------------------------------------------------+  |
+|  |                FinanceContext (Deterministic Reducer)                 |  |
+|  |  * Externalized timestamps & UUIDs   * Pure state transitions         |  |
+|  |  * Idempotent scenario application   * Atomic commitment linking      |  |
+|  +-----------------------------------------------------------------------+  |
+|                                     |                                       |
+|  +----------------------------------v------------------------------------+  |
+|  |                    Pure Financial Engine & Validation                 |  |
+|  |  * Integer-paise calculations (zero IEEE 754 float drift)             |  |
+|  |  * Daily burn rate & safe runway derivation                           |  |
+|  |  * Strict schema validation (rejects NaN, negative expenses, bad dates|  |
+|  +-----------------------------------------------------------------------+  |
+|                                     |                                       |
+|  +----------------------------------v------------------------------------+  |
+|  |           LocalStorage Storage Adapter (v2 Schema Migration)          |  |
+|  +-----------------------------------------------------------------------+  |
++--------------------------------------|--------------------------------------+
+                                       | HTTP POST / WebSocket
+                                       v
++-----------------------------------------------------------------------------+
+|                     SERVER-SIDE PROXY (server.ts - Express)                 |
+|                                                                             |
+|  * Strict rate limiting (60 req/min per IP)                                 |
+|  * Request body sanitization & 100KB payload limit                          |
+|  * Model allowlist (gemini-3.5-flash, gemini-3.1-flash-lite, 3.8-live)      |
+|  * Zero client-side API keys (GEMINI_API_KEY confined to backend)           |
+|  * WebSocket stream connection for Gemini 3.8 Live bidirectional audio      |
++--------------------------------------|--------------------------------------+
+                                       | Secure Google GenAI SDK
+                                       v
++-----------------------------------------------------------------------------+
+|                        GOOGLE GEMINI FOUNDATION MODELS                      |
++-----------------------------------------------------------------------------+
+```
+
+### Source Folder Guide
+
+| Directory / File | Role & Responsibility |
+| :--- | :--- |
+| `src/context/FinanceContext.tsx` | Deterministic application state reducer, action dispatchers, canonical commitment linking, and idempotent scenario operations. |
+| `src/context/useFinanceCalculations.ts` | React custom hook providing memoized financial calculations, health metrics, and atomic action helpers to views. |
+| `src/utils/financialEngine.ts` | Pure financial calculation functions: net cash balance, available-to-spend, safe daily burn, 30-day trajectory, and health score. |
+| `src/utils/currency.ts` | Integer paise conversion functions (`rupeesToPaise`, `paiseToRupees`, `formatPaise`, `formatDeltaPaise`, `parseRupeeInput`). |
+| `src/utils/validation.ts` | Strict entity validators verifying transactions, commitments, budgets, savings goals, and scenario inputs. |
+| `src/utils/storage.ts` | Defensive LocalStorage adapter with schema version migration, error recovery, and quota resilience. |
+| `src/utils/soundEffects.ts` | Web Audio API synthesized tones (success chime, question prompt tone, speech synthesis). |
+| `src/utils/audioLive.ts` | PCM 16-bit audio conversion and streaming buffer player for Gemini 3.8 Live API voice sessions. |
+| `src/components/layout/` | Responsive top bar (`AppHeader.tsx`) and mobile drawer (`AppSidebar.tsx`) with accessible navigation. |
+| `src/components/overview/` | Dashboard cards (`OverviewDashboard.tsx`) and accessible budget allocation chart (`SpendingBudgetChart.tsx`). |
+| `src/components/transactions/` | Transaction ledger (`TransactionsView.tsx`) and add/edit modal (`TransactionModal.tsx`). |
+| `src/components/budget/` | Budget planner (`BudgetPlannerView.tsx`) and category allocation modal (`EditBudgetModal.tsx`). |
+| `src/components/simulator/` | What If? simulator (`WhatIfSimulatorView.tsx`), comparison card (`ScenarioCompareCard.tsx`), and timeline (`ProjectionTimelineChart.tsx`). |
+| `src/components/savings/` | Target vault (`SavingsGoalsView.tsx`), goal modal (`GoalModal.tsx`), and deposit modal (`ContributionModal.tsx`). |
+| `src/components/health/` | 100-point diagnostic health scorecard (`FinancialHealthView.tsx`). |
+| `src/components/chat/` | Multi-turn AI advisor with financial context injection (`GeminiChatView.tsx`). |
+| `src/components/voice/` | Floating voice intent widget (`VoiceTransactionWidget.tsx`) and real-time live voice modal (`GeminiVoiceModal.tsx`). |
+| `server.ts` | Full-stack Express server with rate-limiting, body validation, Gemini REST endpoints, and WebSocket Live server. |
+
+---
+
+## 3. Financial Mechanics & Paise Accounting Rules
+
+### A. The Integer-Paise Standard
+All monetary figures in RupeeWise are stored, computed, and compared as **integer paise** ($1\text{ INR} = 100\text{ paise}$).
+- Eliminates standard IEEE 754 floating-point inaccuracies (such as `0.1 + 0.2 = 0.30000000000000004`).
+- All display conversions occur solely at presentation boundaries via `formatPaise`.
+- Cash deficits are **never artificially clamped to zero**; true negative balances are preserved and displayed clearly to give users an authentic risk signal.
 
 ### B. Canonical Accounting Lifecycle
-To prevent double-counting or phantom deductions, RupeeWise enforces a strict canonical lifecycle between **Protected Commitments** and **Posted Transactions**:
+RupeeWise enforces an exact $1:1$ lifecycle between **Protected Commitments** and **Posted Transactions**:
 
 1. **Unpaid Commitment State:**
-   - An unpaid commitment (e.g., ₹4,000 for Rent) is registered as an obligation.
-   - It reduces **Available-to-Spend** funds immediately, reserving capital for when the bill is due.
-   - It is *not* counted in posted expenses yet, preserving accurate historical burn tracking.
-
+   - Upcoming obligations (e.g. ₹4,000 rent) reduce **Available-to-Spend** immediately.
+   - They do not increment posted expenses, preserving accurate historical burn tracking.
 2. **Payment Execution (Linking):**
-   - When marked as "Paid", RupeeWise atomically creates a linked expense transaction containing `commitmentId: id`.
+   - When marked as "Paid", RupeeWise atomically creates a linked expense transaction with `commitmentId: id`.
    - The commitment records `paidTransactionId: tx.id`.
-   - The paid commitment is no longer deducted as an upcoming obligation—it is now tracked solely via the posted expense transaction, maintaining exact $1:1$ accounting balance.
-
+   - The paid commitment is no longer deducted as an upcoming obligation—it is now tracked via the posted expense transaction, maintaining exact $1:1$ balance without double-deduction.
 3. **Reversal & Deletion Consistency:**
-   - Unmarking a paid commitment atomically reverses/removes the linked expense transaction.
-   - Deleting a transaction that was linked to a commitment reverts the commitment back to its unpaid, protected state.
-   - Re-triggering payment is idempotent; duplicate transactions cannot be generated.
+   - Unmarking a paid commitment atomically reverses and deletes the linked transaction.
+   - Deleting a transaction linked to a commitment returns the commitment to its unpaid, protected status.
+   - Repeating payment actions is idempotent; duplicate transactions cannot be created.
 
-### C. Foundational Mathematical Equations
+### C. Core Mathematical Equations
 
 $$\text{Current Balance} = \sum \text{Posted Income} - \sum \text{Posted Expenses}$$
 
@@ -56,54 +128,131 @@ $$\text{Available to Spend} = \text{Current Balance} - \sum \text{Unpaid Protect
 
 $$\text{Remaining Days} = \max\left(1, (\text{Days in Month} - \text{Current Day} + 1)\right)$$
 
-$$\text{Safe Daily Spending Allowance} = \frac{\text{Available to Spend}}{\text{Remaining Days}}$$
+$$\text{Safe Daily Spending Allowance} = \max\left(0, \left\lfloor\frac{\text{Available to Spend}}{\text{Remaining Days}}\right\rfloor\right)$$
 
-$$\text{Projected Month-End Balance} = \text{Current Balance} - \sum \text{Unpaid Commitments} - (\text{Remaining Days} \times \text{Daily Run Rate}) + \text{Planned Income}$$
-
----
-
-## 3. Key Feature Modules
-
-| View / Module | Purpose & Capability |
-| :--- | :--- |
-| **1. Overview Dashboard** | Instant status at a glance: Real-time Available to Spend, Safe Daily Allowance, 30-day runway gauge, category spending breakdown, and quick transaction logging. |
-| **2. Budget & Commitments** | Category spending caps (Food, Transit, Utilities, Entertainment, Personal) paired with a dedicated Protected Commitments vault with $1:1$ payment reconciliation. |
-| **3. Transaction Ledger** | Full audit log of all financial events with category filtering, date sorting, and zero-latency deletion/editing with automated commitment link cascading. |
-| **4. Voice Transaction Entry** | Natural language voice & text intent parser powered by Gemini API, translating spoken phrases (e.g., *"Spent 80 rupees on chai and samosa"*) into structured transactions. |
-| **5. What If? Decision Simulator** | Side-by-side comparative sandbox allowing users to model one-time purchases, daily spend changes, extra income, or recurring fees across 30 days before committing them. |
-| **6. Savings Goals Vault** | Dedicated target tracker for emergency cushions and long-term milestones with explicit transfer accounting that protects funds from discretionary spending. |
-| **7. Financial Health & Score** | Algorithmic 100-point diagnostic score assessing Commitment Coverage, Discretionary Burn Discipline, Savings Buffer, and Runway Viability. |
-| **8. Gemini AI Financial Advisor** | Real-time, context-aware financial advisor offering frugal optimization advice, emergency survival strategies, and budget rebalancing tactics. |
+$$\text{Projected Month-End Balance} = \text{Current Balance} - \sum \text{Unpaid Commitments} - (\text{Remaining Days} \times \text{Daily Burn}) + \text{Planned Income}$$
 
 ---
 
-## 4. Architectural Integrity & Security
+## 4. Key User Workflows
 
-- **Deterministic State Engine:** All state modifications occur through pure Reducer actions with externalized timestamp and ID generation for complete determinism and reproducible replays.
-- **Idempotent Scenario Operations:** Simulation scenarios use deterministic operation IDs (`opId`), guaranteeing that applying a scenario multiple times cannot create duplicate records or corrupted double-allocations.
-- **Defensive Storage Adapter:** Versioned (`v2`) LocalStorage adapter with schema-level validation on load, safe fallback on malformed JSON, and quota exhaustion resilience.
-- **Server-Side AI Proxy:** Gemini API keys are strictly confined to the backend server environment (`server.ts`). Client requests undergo schema validation, payload length limits, and model allowlisting.
-- **Accessible (a11y) Standards:** Built according to WCAG 2.1 AA specifications with semantic landmark regions, ARIA live-regions for dynamic balance announcements, high-contrast badges, and full keyboard navigational loops (`Tab`, `Escape`, `Enter`).
+1. **Morning Check-In:** View true Available to Spend and daily allowance to plan discretionary meals or travel.
+2. **Logging a Transaction via Voice:**
+   - Click the floating "Voice Add Spend" button or tap the microphone.
+   - Speak naturally: *"Spent 120 rupees on sandwich and coffee"*.
+   - Gemini extracts the slot values (`amount: 120`, `category: Food & Dining`, `description: Sandwich and coffee`, `type: expense`), plays a chime, and adds it to the ledger.
+3. **Simulating a Decision in What If?:**
+   - Select a preset (e.g. "Buy a Smartphone") or enter custom parameters.
+   - Observe the live side-by-side comparison: Available Cash change, Daily Allowance drop, and month-end trajectory.
+   - If acceptable, click **"Apply Scenario"** to commit the decision to the live ledger once with complete idempotency.
+4. **Ring-Fencing Upcoming Bills:**
+   - Add upcoming room rent or electricity bills in Budget Planner.
+   - Watch the cash immediately ring-fence from Available-to-Spend.
+   - When paid on due date, toggle "Mark as paid" to convert it into a linked ledger expense.
+5. **Contributing to Savings Goals:**
+   - Transfer money toward an Emergency Buffer or Milestone goal.
+   - The deposit logs as a savings transaction and ring-fences funds from daily burn.
 
 ---
 
-## 5. Getting Started
+## 5. Security & Privacy Safeguards
+
+- **No Exposed Secrets:** `GEMINI_API_KEY` is strictly confined to the backend server environment (`server.ts`). It is never bundled into client JavaScript.
+- **Strict Rate Limiting:** In-memory sliding-window limiter on `/api/*` endpoints restricts requests to 60 per minute per IP.
+- **Input Sanitization & Schema Validation:** Financial context objects are sanitized and bounded before being forwarded to LLM system instructions.
+- **No Prompt Injection Overrides:** System instructions are hard-coded on the server; client input cannot override core security constraints.
+- **WebSocket Safety:** Max frame payload capped at 1MB, with automatic teardown of microphone media streams and AudioContext instances upon session closure.
+
+---
+
+## 6. Accessibility (WCAG 2.1 AA)
+
+- **Accessible Names:** Every icon-only button possesses an unambiguous `aria-label` or `title` describing its action.
+- **Form Association:** Every input and select dropdown has an associated `label` with matching `id` and `htmlFor`.
+- **Accessible Charts:** Recharts SVG visualizations include visually hidden (`sr-only`) data summary tables and descriptive `role="region"` aria labels.
+- **Dialog Focus Traps:** Custom modals implement keyboard focus traps (`Tab` / `Shift+Tab`), `Escape` key dismissal, and `aria-modal="true"`.
+- **Keyboard Navigation:** Full operational capability via keyboard without traps.
+
+---
+
+## 7. Prerequisites & Installation
 
 ### Prerequisites
-- Node.js 18+
-- npm or bun
+- Node.js 18.0.0 or higher
+- npm 9+ or bun 1.0+
 
-### Installation & Execution
+### Setup Commands
 ```bash
-# Install dependencies
+# 1. Clone the repository
+git clone https://github.com/maddineharish-byte/rupeewise.git
+cd rupeewise
+
+# 2. Install dependencies
 npm install
 
-# Run unit and integration tests (20 tests verifying engine, storage, and intent parser)
+# 3. Configure environment variables
+cp .env.example .env
+# Edit .env and supply your GEMINI_API_KEY
+```
+
+### Environment Variables
+| Variable | Required | Description |
+| :--- | :--- | :--- |
+| `GEMINI_API_KEY` | Recommended | Google Gemini API key for AI chat, voice slot-filling, and Live audio stream. |
+| `PORT` | Optional | Port for the full-stack server (default: `3000`). |
+| `NODE_ENV` | Optional | `development` or `production`. |
+
+---
+
+## 8. Verification & Execution Commands
+
+```bash
+# Run unit and integration tests (30 passing tests)
 npm test
 
-# Launch development full-stack server (Port 3000)
+# Run TypeScript static type check
+npm run lint
+
+# Build production client bundle with Rollup chunking
+npm run build
+
+# Start local full-stack development server
 npm run dev
 
-# Verify production build
-npm run build
+# Start production server
+npm start
 ```
+
+---
+
+## 9. Testing Strategy & Test Coverage
+
+The automated test suite runs via Vitest and covers:
+1. **`src/utils/financialEngine.test.ts` (9 tests):**
+   - Canonical demo baseline calculations.
+   - Planned future transactions isolation.
+   - Deterministic financial health scoring.
+   - Isolated What If? projection calculations.
+   - Reversal of paid commitments upon transaction deletion.
+   - Idempotent scenario application preventing duplicates.
+2. **`src/utils/validationAndBoundaries.test.ts` (10 tests):**
+   - Exact integer-paise arithmetic without floating drift.
+   - Robust rupee string parsing and negative input handling.
+   - Entity validation constraints (transactions, commitments, goals, scenarios).
+   - Deficit transparency (preservation of true negative balances without visual masking).
+3. **`src/utils/storage.test.ts` (5 tests):**
+   - Safe fallback when storage is empty.
+   - Resilient recovery from malformed/corrupted JSON.
+   - Rejection of invalid schema versions.
+   - State persistence while isolating uncommitted transient scenarios.
+4. **`src/utils/naturalLanguageParser.test.ts` (6 tests):**
+   - Slot-filling for expenses, income, categories, and amounts.
+   - Missing field detection and conversation turn prompting.
+
+---
+
+## 10. Known Limitations
+
+- **Browser Speech Recognition Support:** Voice transcription via Web Speech API requires browser support (Chrome, Edge, Safari). In unsupported environments, the widget seamlessly displays an interactive manual text command input.
+- **Microphone Permissions:** Live voice conversation requires granting browser microphone permission.
+- **Client Persistence:** Data is stored in browser LocalStorage (`v2`). Clearing site data restores the canonical demo dataset. Use the "Reset Demo" button anytime to return to the baseline state.
