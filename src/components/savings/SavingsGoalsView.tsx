@@ -8,7 +8,7 @@ import { ContributionModal } from './ContributionModal';
 import { ConfirmModal } from '../common/ConfirmModal';
 
 export function SavingsGoalsView() {
-  const { state, dispatch, summary } = useFinanceCalculations();
+  const { state, dispatch, summary, contributeToGoal } = useFinanceCalculations();
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<SavingsGoal | null>(null);
   const [contribGoal, setContribGoal] = useState<SavingsGoal | null>(null);
@@ -23,7 +23,7 @@ export function SavingsGoalsView() {
   };
 
   const handleContribute = (goalId: string, amountPaise: number) => {
-    dispatch({ type: 'CONTRIBUTE_TO_GOAL', payload: { goalId, amountPaise } });
+    contributeToGoal(goalId, amountPaise);
   };
 
   const handleDeleteGoal = () => {

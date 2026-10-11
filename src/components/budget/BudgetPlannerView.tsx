@@ -18,7 +18,7 @@ import { ProtectedCommitment, ExpenseCategory } from '../../types/finance';
 import { CATEGORY_LIST } from '../../data/initialSeed';
 
 export function BudgetPlannerView() {
-  const { state, dispatch, summary, categorySummaries } = useFinanceCalculations();
+  const { state, dispatch, summary, categorySummaries, toggleCommitmentPaid } = useFinanceCalculations();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [deleteCommitmentId, setDeleteCommitmentId] = useState<string | null>(null);
 
@@ -52,7 +52,7 @@ export function BudgetPlannerView() {
   };
 
   const handleTogglePaid = (id: string) => {
-    dispatch({ type: 'TOGGLE_COMMITMENT_PAID', payload: { id } });
+    toggleCommitmentPaid(id);
   };
 
   const handleDeleteCommitment = () => {

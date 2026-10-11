@@ -6,7 +6,8 @@ import {
   calculateScenarioProjection,
 } from './financialEngine';
 import { formatPaise, paiseToRupees, rupeesToPaise } from './currency';
-import { ScenarioInput } from '../types/finance';
+import { ScenarioInput, AppState } from '../types/finance';
+import { financeReducer } from '../context/FinanceContext';
 
 describe('RupeeWise Core Financial Engine', () => {
   it('correctly calculates the mandatory baseline demo figures', () => {
@@ -45,7 +46,7 @@ describe('RupeeWise Core Financial Engine', () => {
   });
 
   it('ensures planned expenses do NOT deduct from current posted balance', () => {
-    const stateWithPlanned = {
+    const stateWithPlanned: AppState = {
       ...INITIAL_DEMO_STATE,
       transactions: [
         ...INITIAL_DEMO_STATE.transactions,
@@ -112,8 +113,132 @@ describe('RupeeWise Core Financial Engine', () => {
     expect(formatPaise(0)).toBe('₹0');
   });
 
-  it('accurately calculates category spending and detects overspending', () => {
-    const summaries = calculateFinancialSummary(INITIAL_DEMO_STATE);
-    expect(summaries.postedExpensesPaise).toBe(300000);
+  it('preserves true negative deficits in projection without masking them', () => {
+    const heavyExpense: ScenarioInput = {
+      name: 'Luxury Purchase',
+      oneTimeExpensePaise: 1500000, // ₹15,000
+      dailySpendDeltaPaise: 0,
+      additionalIncomePaise: 0,
+      recurringExpensePaise: 0,
+      savingsContributionDeltaPaise: 0,
+      effectiveDay: 10,
+      category: 'Shopping & Personal',
+    };
+    const proj = calculateScenarioProjection(INITIAL_DEMO_STATE, heavyExpense);
+    expect(proj.isDeficit).toBe(true);
+    expect(proj.scenarioEndBalancePaise).toBeLessThan(0);
+    // Trajectory at effectiveDay must report actual negative balance
+    const trajectoryDay10 = proj.dailyTrajectory.find((t) => t.day === 10);
+    expect(trajectoryDay10?.scenarioPaise).toBeLessThan(0);
+  });
+});
+
+describe('RupeeWise Canonical Accounting & Idempotency Rules', () => {
+  it('enforces single deduction lifecycle for paying and reversing commitments', () => {
+    const initialSummary = calculateFinancialSummary(INITIAL_DEMO_STATE);
+    expect(initialSummary.availableToSpendPaise).toBe(500000);
+    expect(initialSummary.unpaidCommitmentsPaise).toBe(200000);
+
+    // Step 1: Pay comm-1 (₹800 = 80,000 paise)
+    const paidState = financeReducer(INITIAL_DEMO_STATE, {
+      type: 'TOGGLE_COMMITMENT_PAID',
+      payload: {
+        id: 'comm-1',
+        generatedTxId: 'comm-tx-comm-1',
+        timestamp: 1728518400000,
+        dateString: '2026-10-10',
+      },
+    });
+
+    const paidSummary = calculateFinancialSummary(paidState);
+    // Current balance decreases by ₹800 (from ₹7,000 to ₹6,200)
+    expect(paidSummary.currentBalancePaise).toBe(620000);
+    // Unpaid commitments drops to ₹1,200
+    expect(paidSummary.unpaidCommitmentsPaise).toBe(120000);
+    // Available to spend remains exactly ₹5,000! (no double-counting)
+    expect(paidSummary.availableToSpendPaise).toBe(500000);
+
+    // Commitment is linked to posted transaction
+    const comm1 = paidState.commitments.find((c) => c.id === 'comm-1');
+    expect(comm1?.isPaid).toBe(true);
+    expect(comm1?.paidTransactionId).toBe('comm-tx-comm-1');
+
+    // Step 2: Idempotent toggle - cannot duplicate payment transactions
+    const doublePayState = financeReducer(paidState, {
+      type: 'TOGGLE_COMMITMENT_PAID',
+      payload: {
+        id: 'comm-1',
+        generatedTxId: 'comm-tx-comm-1',
+      },
+    });
+    // Comm-1 was toggled off (reversed), so payment transaction is cleanly removed
+    expect(doublePayState.transactions.some((t) => t.id === 'comm-tx-comm-1')).toBe(false);
+    const reversedSummary = calculateFinancialSummary(doublePayState);
+    expect(reversedSummary.currentBalancePaise).toBe(700000);
+    expect(reversedSummary.unpaidCommitmentsPaise).toBe(200000);
+    expect(reversedSummary.availableToSpendPaise).toBe(500000);
+  });
+
+  it('reverts commitment to unpaid if payment transaction is deleted', () => {
+    // Pay comm-1
+    const paidState = financeReducer(INITIAL_DEMO_STATE, {
+      type: 'TOGGLE_COMMITMENT_PAID',
+      payload: {
+        id: 'comm-1',
+        generatedTxId: 'comm-tx-comm-1',
+        timestamp: 1728518400000,
+        dateString: '2026-10-10',
+      },
+    });
+
+    // Delete the payment transaction
+    const deletedState = financeReducer(paidState, {
+      type: 'DELETE_TRANSACTION',
+      payload: { id: 'comm-tx-comm-1' },
+    });
+
+    const comm1 = deletedState.commitments.find((c) => c.id === 'comm-1');
+    // Commitment must cleanly revert to unpaid
+    expect(comm1?.isPaid).toBe(false);
+    expect(comm1?.paidTransactionId).toBeUndefined();
+
+    const summary = calculateFinancialSummary(deletedState);
+    expect(summary.currentBalancePaise).toBe(700000);
+    expect(summary.unpaidCommitmentsPaise).toBe(200000);
+  });
+
+  it('guarantees idempotency when applying scenarios with operation ID', () => {
+    const freelanceScenario: ScenarioInput = {
+      name: 'Freelance Project',
+      oneTimeExpensePaise: 0,
+      dailySpendDeltaPaise: 0,
+      additionalIncomePaise: 600000, // ₹6,000
+      recurringExpensePaise: 0,
+      savingsContributionDeltaPaise: 0,
+      effectiveDay: 10,
+      category: 'Other',
+    };
+
+    const action = {
+      type: 'APPLY_SCENARIO' as const,
+      payload: {
+        scenario: freelanceScenario,
+        operationId: 'op-freelance-test-123',
+        timestamp: 1728518400000,
+        dateString: '2026-10-10',
+      },
+    };
+
+    // Apply once
+    const state1 = financeReducer(INITIAL_DEMO_STATE, action);
+    expect(state1.transactions.length).toBe(INITIAL_DEMO_STATE.transactions.length + 1);
+    expect(state1.appliedScenarioHistory.length).toBe(1);
+
+    // Apply again with identical operation ID
+    const state2 = financeReducer(state1, action);
+    // MUST NOT create duplicate income transaction or history item
+    expect(state2.transactions.length).toBe(state1.transactions.length);
+    expect(state2.appliedScenarioHistory.length).toBe(1);
+    expect(state2).toEqual(state1);
   });
 });

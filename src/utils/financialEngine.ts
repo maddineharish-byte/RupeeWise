@@ -398,8 +398,8 @@ export function calculateScenarioProjection(
 
     dailyTrajectory.push({
       day: d,
-      baselinePaise: Math.max(0, currentBaseline),
-      scenarioPaise: Math.max(-500000, currentScenario),
+      baselinePaise: currentBaseline,
+      scenarioPaise: currentScenario,
     });
   }
 

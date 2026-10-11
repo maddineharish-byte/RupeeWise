@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Check } from 'lucide-react';
 import { ExpenseCategory } from '../../types/finance';
 import { useFinanceCalculations } from '../../context/useFinanceCalculations';
@@ -23,6 +23,51 @@ export function EditBudgetModal({ isOpen, onClose }: EditBudgetModalProps) {
     }
     return map;
   });
+
+  const modalRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey && document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        } else if (!e.shiftKey && document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      clearTimeout(timer);
+      document.body.style.overflow = 'auto';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -73,7 +118,11 @@ export function EditBudgetModal({ isOpen, onClose }: EditBudgetModalProps) {
       aria-labelledby="budget-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150"
     >
-      <div className="w-full max-w-lg bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className="w-full max-w-lg bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden max-h-[90vh] flex flex-col focus:outline-none"
+      >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
           <h3 id="budget-modal-title" className="text-base font-semibold text-slate-900">
             Adjust 30-Day Budget Allocations
@@ -81,7 +130,7 @@ export function EditBudgetModal({ isOpen, onClose }: EditBudgetModalProps) {
           <button
             onClick={onClose}
             aria-label="Close dialog"
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition-colors"
+            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-md transition-colors focus:ring-2 focus:ring-slate-400 focus:outline-none"
           >
             <X className="w-5 h-5" />
           </button>
@@ -96,13 +145,14 @@ export function EditBudgetModal({ isOpen, onClose }: EditBudgetModalProps) {
             <div className="relative">
               <span className="absolute left-3 top-2.5 text-slate-400 font-mono text-sm">₹</span>
               <input
+                ref={inputRef}
                 id="total-budget"
                 type="number"
                 min="0"
                 step="any"
                 value={startingBudgetStr}
                 onChange={(e) => setStartingBudgetStr(e.target.value)}
-                className="w-full pl-8 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono font-bold text-slate-900 focus:bg-white focus:outline-none"
+                className="w-full pl-8 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
                 required
               />
             </div>
@@ -113,6 +163,7 @@ export function EditBudgetModal({ isOpen, onClose }: EditBudgetModalProps) {
 
           {/* Allocation summary banner */}
           <div
+            role="status"
             className={`p-3 rounded-lg border text-xs flex items-center justify-between font-mono ${
               allocationDelta === 0
                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
@@ -141,18 +192,19 @@ export function EditBudgetModal({ isOpen, onClose }: EditBudgetModalProps) {
                 key={b.category}
                 className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-slate-50 border border-slate-100"
               >
-                <label className="text-xs font-medium text-slate-800 flex-1 truncate">
+                <label htmlFor={`cat-${b.category}`} className="text-xs font-medium text-slate-800 flex-1 truncate">
                   {b.category}
                 </label>
                 <div className="relative w-36">
                   <span className="absolute left-2.5 top-1.5 text-slate-400 text-xs font-mono">₹</span>
                   <input
+                    id={`cat-${b.category}`}
                     type="number"
                     min="0"
                     step="any"
                     value={allocations[b.category] ?? ''}
                     onChange={(e) => handleAllocationChange(b.category, e.target.value)}
-                    className="w-full pl-6 pr-2 py-1 text-xs font-mono text-right bg-white border border-slate-200 rounded-md focus:border-slate-400 focus:outline-none"
+                    className="w-full pl-6 pr-2 py-1 text-xs font-mono text-right bg-white border border-slate-200 rounded-md focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
                   />
                 </div>
               </div>
@@ -163,13 +215,13 @@ export function EditBudgetModal({ isOpen, onClose }: EditBudgetModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors focus:ring-2 focus:ring-slate-400 focus:outline-none"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors shadow-xs"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors shadow-xs focus:ring-2 focus:ring-slate-900 focus:outline-none"
             >
               <Check className="w-3.5 h-3.5 text-emerald-400" />
               <span>Save Budget</span>

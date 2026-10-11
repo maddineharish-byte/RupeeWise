@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Check } from 'lucide-react';
 import { ExpenseCategory, Transaction, TransactionStatus, TransactionType } from '../../types/finance';
 import { CATEGORY_LIST } from '../../data/initialSeed';
-import { formatPaise, parseRupeeInput } from '../../utils/currency';
+import { parseRupeeInput } from '../../utils/currency';
+import { validateTransaction } from '../../utils/validation';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -27,6 +28,9 @@ export function TransactionModal({
   const [status, setStatus] = useState<TransactionStatus>('posted');
   const [error, setError] = useState<string>('');
 
+  const modalRef = useRef<HTMLDivElement>(null);
+  const amountInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (initialTransaction) {
       setType(initialTransaction.type || 'expense');
@@ -49,6 +53,49 @@ export function TransactionModal({
     }
     setError('');
   }, [initialTransaction, isOpen]);
+
+  // Focus management, Esc key, and Tab focus trapping
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timer = setTimeout(() => {
+      amountInputRef.current?.focus();
+    }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey && document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        } else if (!e.shiftKey && document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      clearTimeout(timer);
+      document.body.style.overflow = 'auto';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -82,6 +129,12 @@ export function TransactionModal({
       createdAt: initialTransaction?.createdAt || Date.now(),
     };
 
+    const validation = validateTransaction(tx);
+    if (!validation.isValid) {
+      setError(validation.error || 'Invalid transaction details.');
+      return;
+    }
+
     onSave(tx);
     onClose();
   };
@@ -93,7 +146,11 @@ export function TransactionModal({
       aria-labelledby="tx-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150"
     >
-      <div className="w-full max-w-lg bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden">
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className="w-full max-w-lg bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden focus:outline-none"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h3 id="tx-modal-title" className="text-base font-semibold text-slate-900">
@@ -102,7 +159,7 @@ export function TransactionModal({
           <button
             onClick={onClose}
             aria-label="Close dialog"
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition-colors"
+            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-md transition-colors focus:ring-2 focus:ring-slate-400 focus:outline-none"
           >
             <X className="w-5 h-5" />
           </button>
@@ -110,7 +167,10 @@ export function TransactionModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {isVoicePrefilled && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center justify-between">
+            <div
+              role="status"
+              className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center justify-between"
+            >
               <span className="font-medium">
                 ✨ Auto-filled by Voice Recognition: Review and save below.
               </span>
@@ -118,7 +178,10 @@ export function TransactionModal({
           )}
 
           {error && (
-            <div className="p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg">
+            <div
+              role="alert"
+              className="p-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg"
+            >
               {error}
             </div>
           )}
@@ -134,7 +197,7 @@ export function TransactionModal({
                 onClick={() => setType('expense')}
                 className={`py-1.5 text-xs font-medium rounded-md transition-all ${
                   type === 'expense'
-                    ? 'bg-white text-rose-700 shadow-xs'
+                    ? 'bg-white text-rose-700 shadow-xs font-semibold'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -145,7 +208,7 @@ export function TransactionModal({
                 onClick={() => setType('income')}
                 className={`py-1.5 text-xs font-medium rounded-md transition-all ${
                   type === 'income'
-                    ? 'bg-white text-emerald-700 shadow-xs'
+                    ? 'bg-white text-emerald-700 shadow-xs font-semibold'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -162,6 +225,7 @@ export function TransactionModal({
             <div className="relative">
               <span className="absolute left-3 top-2.5 text-slate-400 font-mono text-sm">₹</span>
               <input
+                ref={amountInputRef}
                 id="tx-amount"
                 type="number"
                 step="any"
@@ -237,7 +301,7 @@ export function TransactionModal({
                 onClick={() => setStatus('posted')}
                 className={`py-1.5 text-xs font-medium rounded-md transition-all ${
                   status === 'posted'
-                    ? 'bg-white text-slate-900 shadow-xs'
+                    ? 'bg-white text-slate-900 shadow-xs font-semibold'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -248,7 +312,7 @@ export function TransactionModal({
                 onClick={() => setStatus('planned')}
                 className={`py-1.5 text-xs font-medium rounded-md transition-all ${
                   status === 'planned'
-                    ? 'bg-white text-slate-900 shadow-xs'
+                    ? 'bg-white text-slate-900 shadow-xs font-semibold'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -267,13 +331,13 @@ export function TransactionModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors focus:ring-2 focus:ring-slate-400 focus:outline-none"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors shadow-xs"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors shadow-xs focus:ring-2 focus:ring-slate-900 focus:outline-none"
             >
               <Check className="w-3.5 h-3.5 text-emerald-400" />
               <span>{initialTransaction ? 'Save Changes' : 'Record Transaction'}</span>

@@ -28,6 +28,8 @@ export interface Transaction {
   date: string; // ISO format YYYY-MM-DD
   status: TransactionStatus;
   createdAt: number;
+  commitmentId?: string; // Canonical link to the ProtectedCommitment paid by this transaction
+  scenarioOperationId?: string; // Stable idempotency key for scenario-generated transactions
 }
 
 export interface ProtectedCommitment {
@@ -39,6 +41,7 @@ export interface ProtectedCommitment {
   dueDay: number; // Day of period, e.g. 15
   isPaid: boolean;
   notes?: string;
+  paidTransactionId?: string; // Canonical reference to the posted transaction recording this payment
 }
 
 export interface CategoryBudget {

@@ -8,7 +8,14 @@ import {
 } from '../utils/financialEngine';
 
 export function useFinanceCalculations() {
-  const { state, dispatch, resetToDemo } = useFinance();
+  const {
+    state,
+    dispatch,
+    resetToDemo,
+    applyScenarioWithIdempotency,
+    toggleCommitmentPaid,
+    contributeToGoal,
+  } = useFinance();
 
   const summary = useMemo(() => calculateFinancialSummary(state), [state]);
   const categorySummaries = useMemo(() => calculateCategorySummaries(state), [state]);
@@ -23,6 +30,9 @@ export function useFinanceCalculations() {
     state,
     dispatch,
     resetToDemo,
+    applyScenarioWithIdempotency,
+    toggleCommitmentPaid,
+    contributeToGoal,
     summary,
     categorySummaries,
     healthScore,

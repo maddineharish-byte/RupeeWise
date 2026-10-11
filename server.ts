@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import dotenv from 'dotenv';
@@ -14,12 +14,32 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = createServer(app);
 
-// WebSocket Server for Gemini 3.8 Live API Voice conversations
-const wss = new WebSocketServer({ server, path: '/api/live' });
+// Simple in-memory rate limiting map (IP -> timestamps[])
+const rateLimitMap = new Map<string, number[]>();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 60; // 60 requests/min per IP
 
-app.use(express.json({ limit: '10mb' }));
+function rateLimiter(req: Request, res: Response, next: NextFunction): void {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const timestamps = rateLimitMap.get(ip) || [];
+  const recentTimestamps = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
 
-// Shared server-side Google GenAI instance with telemetry User-Agent header
+  if (recentTimestamps.length >= MAX_REQUESTS_PER_WINDOW) {
+    res.status(429).json({ error: 'Too many requests. Please slow down and try again shortly.' });
+    return;
+  }
+
+  recentTimestamps.push(now);
+  rateLimitMap.set(ip, recentTimestamps);
+  next();
+}
+
+// Security: Enforce tight JSON body limit (100KB instead of 10MB)
+app.use(express.json({ limit: '100kb' }));
+app.use(rateLimiter);
+
+// Gemini API instance with server-side API key and telemetry User-Agent header
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
   httpOptions: {
@@ -29,42 +49,84 @@ const ai = new GoogleGenAI({
   },
 });
 
+// Explicit model allowlist
+const ALLOWED_CHAT_MODELS = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview'] as const;
+
+/**
+ * Validates and sanitizes financial context fields.
+ */
+function sanitizeFinancialContext(ctx: any) {
+  if (!ctx || typeof ctx !== 'object') return null;
+
+  const sanitizeNumber = (val: any, fallback: number, max = 10000000) => {
+    const num = Number(val);
+    return isFinite(num) && num >= 0 && num <= max ? Math.round(num) : fallback;
+  };
+
+  return {
+    startingBudgetRupees: sanitizeNumber(ctx.startingBudgetRupees, 10000),
+    currentDay: Math.min(31, Math.max(1, sanitizeNumber(ctx.currentDay, 10, 31))),
+    totalDays: Math.min(31, Math.max(1, sanitizeNumber(ctx.totalDays, 30, 31))),
+    daysRemaining: Math.min(31, Math.max(1, sanitizeNumber(ctx.daysRemaining, 21, 31))),
+    currentBalanceRupees: sanitizeNumber(ctx.currentBalanceRupees, 7000),
+    unpaidCommitmentsRupees: sanitizeNumber(ctx.unpaidCommitmentsRupees, 2000),
+    availableToSpendRupees: sanitizeNumber(ctx.availableToSpendRupees, 5000),
+    dailyAllowanceRupees: sanitizeNumber(ctx.dailyAllowanceRupees, 238),
+    currentDailyBurnRupees: sanitizeNumber(ctx.currentDailyBurnRupees, 300),
+    remainingSavingsTargetRupees: sanitizeNumber(ctx.remainingSavingsTargetRupees, 2000),
+    healthScore: Math.min(100, Math.max(0, sanitizeNumber(ctx.healthScore, 91, 100))),
+    riskLevel: ['Low', 'Moderate', 'Elevated', 'High'].includes(ctx.riskLevel) ? ctx.riskLevel : 'Low',
+  };
+}
+
 // REST Endpoint: Multi-Turn Gemini Chat
 app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { messages, model, systemInstruction, financialContext } = req.body;
+    const { messages, model, financialContext } = req.body;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       res.status(400).json({ error: 'Messages array is required.' });
       return;
     }
 
-    // Model selection based on user request / task complexity
-    // Default to gemini-3.5-flash for general tasks, gemini-3.1-flash-lite for fast tasks, gemini-3.1-pro-preview for complex
-    const allowedModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview'];
-    const selectedModel = allowedModels.includes(model) ? model : 'gemini-3.5-flash';
+    // Security bounds: max 20 messages history, max 2000 chars per message
+    if (messages.length > 20) {
+      res.status(400).json({ error: 'Message history limit exceeded (max 20 messages).' });
+      return;
+    }
 
-    // Construct enriched system instruction
-    let fullSystemInstruction =
-      systemInstruction ||
-      `You are RupeeWise AI, an expert, empathetic personal finance coach for Indian students, first-time job holders, and young adults.
+    for (const m of messages) {
+      if (!m || typeof m.content !== 'string' || m.content.length > 2000) {
+        res.status(400).json({ error: 'Message content must be string and under 2,000 characters.' });
+        return;
+      }
+    }
+
+    // Strict model allowlist
+    const selectedModel = (ALLOWED_CHAT_MODELS as readonly string[]).includes(model)
+      ? model
+      : 'gemini-3.5-flash';
+
+    // Server-enforced system prompt (client systemInstruction cannot override)
+    let fullSystemInstruction = `You are RupeeWise AI, an expert, empathetic personal finance coach for Indian students, first-time job holders, and young adults.
 Your currency is Indian Rupees (₹).
 Tone: practical, empowering, analytical, culturally aware of student realities (mess food, college books, hostel/PG rent, UPI habits, pocket money, festival savings).
 Help the user make wise trade-offs, manage daily burn rates, and avoid debt or impulsive spending.`;
 
-    if (financialContext) {
+    const sanitizedCtx = sanitizeFinancialContext(financialContext);
+    if (sanitizedCtx) {
       fullSystemInstruction += `\n\n[USER CURRENT FINANCIAL SNAPSHOT]:
-- Starting 30-Day Budget: ₹${financialContext.startingBudgetRupees || 10000}
-- Current Day: Day ${financialContext.currentDay || 10} of ${financialContext.totalDays || 30} (${financialContext.daysRemaining || 21} days remaining)
-- Current Bank Balance: ₹${financialContext.currentBalanceRupees || 7000} (before unpaid commitments)
-- Unpaid Protected Bills: ₹${financialContext.unpaidCommitmentsRupees || 2000}
-- True Available to Spend: ₹${financialContext.availableToSpendRupees || 5000}
-- Safe Daily Spending Allowance: ₹${financialContext.dailyAllowanceRupees || 238}/day
-- Current Daily Burn: ₹${financialContext.currentDailyBurnRupees || 300}/day
-- Remaining Savings Target: ₹${financialContext.remainingSavingsTargetRupees || 2000}
-- Financial Health Score: ${financialContext.healthScore || 91}/100 (${financialContext.riskLevel || 'Low'} Risk)
+- Starting 30-Day Budget: ₹${sanitizedCtx.startingBudgetRupees}
+- Current Day: Day ${sanitizedCtx.currentDay} of ${sanitizedCtx.totalDays} (${sanitizedCtx.daysRemaining} days remaining)
+- Current Bank Balance: ₹${sanitizedCtx.currentBalanceRupees} (before unpaid commitments)
+- Unpaid Protected Bills: ₹${sanitizedCtx.unpaidCommitmentsRupees}
+- True Available to Spend: ₹${sanitizedCtx.availableToSpendRupees}
+- Safe Daily Spending Allowance: ₹${sanitizedCtx.dailyAllowanceRupees}/day
+- Current Daily Burn: ₹${sanitizedCtx.currentDailyBurnRupees}/day
+- Remaining Savings Target: ₹${sanitizedCtx.remainingSavingsTargetRupees}
+- Financial Health Score: ${sanitizedCtx.healthScore}/100 (${sanitizedCtx.riskLevel} Risk)
 
-Use these exact figures when advising the user about their financial reality.`;
+Use these exact verified figures when advising the user.`;
     }
 
     // Convert multi-turn history into Gemini contents format
@@ -87,9 +149,10 @@ Use these exact figures when advising the user about their financial reality.`;
       modelUsed: selectedModel,
     });
   } catch (error: any) {
-    console.error('RupeeWise Chat Error:', error);
+    console.error('RupeeWise Chat Error:', error?.message || 'Internal error');
+    // Security: Do not expose raw internal stack traces or API keys
     res.status(500).json({
-      error: error.message || 'Failed to generate response from Gemini API',
+      error: 'Failed to generate financial advisory response. Please try again.',
     });
   }
 });
@@ -98,6 +161,25 @@ Use these exact figures when advising the user about their financial reality.`;
 app.post('/api/voice-transaction', async (req: Request, res: Response): Promise<void> => {
   try {
     const { history, transcript } = req.body;
+
+    // Length limit checks
+    if (transcript && (typeof transcript !== 'string' || transcript.length > 500)) {
+      res.status(400).json({ error: 'Transcript must be under 500 characters.' });
+      return;
+    }
+
+    if (history && Array.isArray(history)) {
+      if (history.length > 10) {
+        res.status(400).json({ error: 'History limit exceeded (max 10 turns).' });
+        return;
+      }
+      for (const h of history) {
+        if (!h || typeof h.text !== 'string' || h.text.length > 500) {
+          res.status(400).json({ error: 'Conversation turns must be under 500 characters.' });
+          return;
+        }
+      }
+    }
 
     if (!transcript && (!history || history.length === 0)) {
       res.status(400).json({ error: 'Transcript or conversation history is required.' });
@@ -108,7 +190,7 @@ app.post('/api/voice-transaction', async (req: Request, res: Response): Promise<
 ${(history || [])
   .map((h: { role: string; text: string }) => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.text}`)
   .join('\n')}
-Latest User Spoken Input: "${transcript}"`;
+Latest User Spoken Input: "${transcript || ''}"`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.5-flash',
@@ -170,18 +252,38 @@ Logic:
     const parsed = JSON.parse(response.text || '{}');
     res.json(parsed);
   } catch (error: any) {
-    console.error('Voice transaction extraction error:', error);
+    console.error('Voice transaction extraction error:', error?.message || 'Internal error');
     res.status(500).json({
-      error: error.message || 'Failed to process voice transaction',
+      error: 'Failed to process voice transaction.',
     });
   }
 });
 
-// WebSocket Handler: Gemini 3.8 Live API Voice Conversations
-wss.on('connection', async (clientWs: WebSocket) => {
+// WebSocket Server for Gemini 3.8 Live API Voice conversations
+const wss = new WebSocketServer({
+  server,
+  path: '/api/live',
+  maxPayload: 1024 * 1024, // 1MB max websocket frame size
+});
+
+wss.on('connection', async (clientWs: WebSocket, req) => {
   console.log('Client connected to Gemini Live voice stream');
 
   let session: any = null;
+  let isClosed = false;
+
+  const cleanupSession = () => {
+    if (isClosed) return;
+    isClosed = true;
+    if (session) {
+      try {
+        session.close();
+      } catch (e) {
+        // ignore
+      }
+      session = null;
+    }
+  };
 
   try {
     session = await ai.live.connect({
@@ -217,24 +319,28 @@ Keep your answers brief (1-3 sentences) and conversational since this is spoken 
           if (clientWs.readyState === WebSocket.OPEN) {
             clientWs.send(JSON.stringify({ type: 'session_closed' }));
           }
+          cleanupSession();
         },
         onerror: (err: any) => {
-          console.error('Gemini Live session error:', err);
+          console.error('Gemini Live session error:', err?.message || 'Unknown');
           if (clientWs.readyState === WebSocket.OPEN) {
-            clientWs.send(JSON.stringify({ type: 'error', message: err.message || 'Live API error' }));
+            clientWs.send(JSON.stringify({ type: 'error', message: 'Gemini Live voice service encountered an error.' }));
           }
+          cleanupSession();
         },
       },
     });
 
     // Notify client that voice session is ready
-    clientWs.send(JSON.stringify({ type: 'ready' }));
+    if (clientWs.readyState === WebSocket.OPEN) {
+      clientWs.send(JSON.stringify({ type: 'ready' }));
+    }
 
     // Forward microphone audio chunks from client to Gemini Live session
     clientWs.on('message', (rawData: any) => {
       try {
         const payload = JSON.parse(rawData.toString());
-        if (payload.audio && session) {
+        if (payload.audio && session && typeof payload.audio === 'string') {
           session.sendRealtimeInput({
             audio: {
               data: payload.audio,
@@ -249,25 +355,25 @@ Keep your answers brief (1-3 sentences) and conversational since this is spoken 
 
     clientWs.on('close', () => {
       console.log('Client disconnected from Gemini Live voice stream');
-      if (session) {
-        try {
-          session.close();
-        } catch (e) {
-          // ignore
-        }
-      }
+      cleanupSession();
+    });
+
+    clientWs.on('error', (err) => {
+      console.error('Client WebSocket error:', err);
+      cleanupSession();
     });
   } catch (err: any) {
-    console.error('Failed to initialize Gemini Live session:', err);
+    console.error('Failed to initialize Gemini Live session:', err?.message || 'Error');
     if (clientWs.readyState === WebSocket.OPEN) {
       clientWs.send(
         JSON.stringify({
           type: 'error',
-          message: err.message || 'Failed to connect to Gemini 3.8 Live API',
+          message: 'Failed to connect to Gemini 3.8 Live API.',
         })
       );
       clientWs.close();
     }
+    cleanupSession();
   }
 });
 

@@ -30,7 +30,7 @@ interface PresetItem {
 }
 
 export function WhatIfSimulatorView() {
-  const { state, dispatch, healthScore } = useFinanceCalculations();
+  const { state, dispatch, healthScore, applyScenarioWithIdempotency } = useFinanceCalculations();
 
   // Active scenario inputs state
   const [name, setName] = useState('Buy a Smartphone');
@@ -166,7 +166,7 @@ export function WhatIfSimulatorView() {
   const projection = calculateScenarioProjection(state, currentScenario);
 
   const handleApplyConfirm = () => {
-    dispatch({ type: 'APPLY_SCENARIO', payload: currentScenario });
+    applyScenarioWithIdempotency(currentScenario);
     setIsApplyConfirmOpen(false);
     setAppliedFeedback(`Scenario "${currentScenario.name}" was committed to your live financial state.`);
   };
